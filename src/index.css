@@ -1,0 +1,104 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+
+  height: 100%;
+  width: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: row;
+
+  flex: 1;
+  justify-content: flex-start;
+}
+
+.main-area {
+  /* TODO: change this color to something else (at now it test for div) */
+  background-color: #2a5e76;
+  padding: 10px;
+
+  flex: 1;
+}
+
+.game-area-with-canvas {
+  width: 100%;
+  height: 100%;
+  background-color: #ffffff;
+}
+
+.game-area-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar {
+  /* width: 50px; */
+  width: 200px;
+  /* TODO: change this color to something else (at now it test for div) */
+  background-color: #424040;
+  padding: 10px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  transition: width 0.3s ease-in-out;
+}
+
+/* Use later for hover effect */
+/* .sidebar:hover {
+  width: 200px;
+} */
+
+.sidebar-item {
+  width: 100%;
+  height: 40px;
+  background-color: #bdb8b8;
+  padding: 10px;
+
+  display: flex;
+
+  border-width: 1px;
+  border-color: #000000;
+  border-style: solid;
+}
+
+.sidebar-item-button,
+.sidebar-item-button-home {
+  width: 100%;
+  height: 100%;
+  background-color: #99aade;
+
+  flex: 1;
+
+  transition: opacity 0.3s ease-in-out;
+}
+
+.sidebar-item-button-home:hover,
+.sidebar-item-button:hover {
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+#map-url-form {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+}
+
+#map-url-input {
+  width: 100%;
+  height: 100%;
+}
