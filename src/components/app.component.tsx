@@ -2,7 +2,6 @@ import React from "react";
 
 import { MainAreaComponent } from "./main-area";
 import { SidebarComponent } from "./sidebar";
-import { GameComponent } from "./phaser-game/game";
 
 export function AppComponent() {
   return (
