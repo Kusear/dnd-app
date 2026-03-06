@@ -106,6 +106,3 @@ assets/
 
 test*.js
 test*.ts
-# test*.[jsx|tsx]
-# test.*.[js|ts]
-# test.*.[jsx|tsx]

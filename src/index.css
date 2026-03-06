@@ -24,28 +24,189 @@ body {
 
 .main-area {
   /* TODO: change this color to something else (at now it test for div) */
-  background-color: #2a5e76;
+  background-color: #83a1af;
   padding: 10px;
 
   flex: 1;
 }
 
 .game-area-with-canvas {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   height: 100%;
   background-color: #ffffff;
 }
 
 .game-area-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
 }
 
-.sidebar {
-  /* width: 50px; */
+.game-area-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.game-area-canvas-pan-layer {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.game-area-canvas-pan-layer-active {
+  cursor: grabbing;
+}
+
+.game-area-token {
+  position: absolute;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.game-area-token:active {
+  cursor: grabbing;
+}
+
+.game-area-token-active {
+  outline: 2px dashed #111111;
+}
+
+.game-area-token-selected {
+  box-shadow: 0 0 0 3px #111827;
+}
+
+.game-area-trash {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  min-width: 92px;
+  min-height: 40px;
+  padding: 8px 12px;
+  background-color: #2d2d2d;
+  border: 2px solid #666666;
+  border-radius: 8px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  pointer-events: auto;
+}
+
+.game-area-trash-active {
+  border-color: #c0392b;
+  background-color: #7f1d1d;
+}
+
+.game-area-canvas-zoom-controls {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #ffffff;
+  border: 1px solid #4b5563;
+  border-radius: 8px;
+  padding: 6px 10px;
+  pointer-events: auto;
+}
+
+.game-area-control-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  background-color: #f3f4f6;
+  cursor: pointer;
+}
+
+.game-area-control-button-reset {
+  width: auto;
+  min-width: 48px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.game-area-control-value {
+  min-width: 46px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.game-area-token-settings {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   width: 200px;
+  border: 1px solid #4b5563;
+  border-radius: 8px;
+  background-color: #ffffff;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.game-area-token-settings-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.game-area-token-settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.game-area-token-settings-input {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #9ca3af;
+  border-radius: 4px;
+}
+
+.game-area-token-settings-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.game-area-color-option {
+  width: 22px;
+  height: 22px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.game-area-color-option-active {
+  border-color: #111827;
+}
+
+.sidebar {
+  width: 50px;
+  /* width: 200px; */
   /* TODO: change this color to something else (at now it test for div) */
-  background-color: #424040;
+  background-color: #674bf3;
   padding: 10px;
 
   display: flex;
@@ -56,38 +217,33 @@ body {
 }
 
 /* Use later for hover effect */
-/* .sidebar:hover {
+.sidebar:hover {
   width: 200px;
-} */
-
-.sidebar-item {
-  width: 100%;
-  height: 40px;
-  background-color: #bdb8b8;
-  padding: 10px;
-
-  display: flex;
-
-  border-width: 1px;
-  border-color: #000000;
-  border-style: solid;
-}
-
-.sidebar-item-button,
-.sidebar-item-button-home {
-  width: 100%;
-  height: 100%;
-  background-color: #99aade;
-
-  flex: 1;
-
-  transition: opacity 0.3s ease-in-out;
 }
 
 .sidebar-item-button-home:hover,
 .sidebar-item-button:hover {
   cursor: pointer;
   opacity: 0.8;
+}
+
+.sidebar-token-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-item-button,
+.sidebar-item-button-home,
+.sidebar-token-item {
+  width: 100%;
+  min-height: 38px;
+  border: 1px dashed #0f172a;
+  background-color: #c8d4f3;
+  color: #0f172a;
+  padding: 8px;
+  text-align: left;
+  cursor: grab;
 }
 
 #map-url-form {
