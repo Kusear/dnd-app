@@ -6,6 +6,7 @@ import {
 } from "./models/game-area-drag-payload.model";
 import { GAME_AREA_DRAG_DATA_FORMAT } from "./models/game-area-drag-data-format.constant";
 import { GameTokenInstance } from "./models/game-token-instance.model";
+import { gameAreaWebSocketService } from "../../../game-area-web-socket.service";
 
 const DEFAULT_OVERLAY_Z_INDEX = 1;
 const ACTIVE_OVERLAY_Z_INDEX = 2;
@@ -41,11 +42,186 @@ interface CanvasPanStart {
   readonly originY: number;
 }
 
-function generateTokenId(): string {
-  // if ("randomUUID" in globalThis.crypto) {
-  //   return globalThis.crypto.randomUUID();
-  // }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+interface TokenMovedPosition {
+  readonly x: number;
+  readonly y: number;
+}
+
+interface TokenMovedServerMessageData {
+  readonly tokenId: string;
+  readonly prevPos: TokenMovedPosition;
+  readonly newPos: TokenMovedPosition;
+}
+
+interface TokenMovedServerMessage {
+  readonly command: "token-moved";
+  readonly data: TokenMovedServerMessageData;
+}
+
+interface TokenAddedServerMessageToken {
+  readonly type: "hero" | "monster" | "marker";
+  readonly label: string;
+  readonly width: number;
+  readonly height: number;
+  readonly color: `#${string}`;
+}
+
+interface TokenAddedServerMessageData {
+  readonly tokenId: string;
+  readonly token: TokenAddedServerMessageToken;
+  readonly position: {
+    readonly x: number;
+    readonly y: number;
+  };
+}
+
+interface TokenAddedServerMessage {
+  readonly command: "token-added";
+  readonly data: TokenAddedServerMessageData;
+}
+
+interface MapChangedServerMessageData {
+  readonly newMap: string;
+  readonly prevMap: string;
+}
+
+interface MapChangedServerMessage {
+  readonly command: "map-changed";
+  readonly data: MapChangedServerMessageData;
+}
+
+interface DrawImageContainArguments {
+  readonly imageWidth: number;
+  readonly imageHeight: number;
+  readonly areaWidth: number;
+  readonly areaHeight: number;
+}
+
+interface DrawImageContainResult {
+  readonly drawX: number;
+  readonly drawY: number;
+  readonly drawWidth: number;
+  readonly drawHeight: number;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isTokenMovedPosition(value: unknown): value is TokenMovedPosition {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return typeof value.x === "number" && typeof value.y === "number";
+}
+
+function isTokenMovedServerMessage(value: unknown): value is TokenMovedServerMessage {
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (value.command !== "token-moved" || !isRecord(value.data)) {
+    return false;
+  }
+  return (
+    typeof value.data.tokenId === "string" &&
+    isTokenMovedPosition(value.data.prevPos) &&
+    isTokenMovedPosition(value.data.newPos)
+  );
+}
+
+function isTokenAddedServerToken(value: unknown): value is TokenAddedServerMessageToken {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    (value.type === "hero" || value.type === "monster" || value.type === "marker") &&
+    typeof value.label === "string" &&
+    typeof value.width === "number" &&
+    typeof value.height === "number" &&
+    typeof value.color === "string"
+  );
+}
+
+function isTokenAddedServerMessage(value: unknown): value is TokenAddedServerMessage {
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (value.command !== "token-added" || !isRecord(value.data)) {
+    return false;
+  }
+  return (
+    typeof value.data.tokenId === "string" &&
+    isTokenAddedServerToken(value.data.token) &&
+    isTokenMovedPosition(value.data.position)
+  );
+}
+
+function isMapChangedServerMessage(value: unknown): value is MapChangedServerMessage {
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (value.command !== "map-changed" || !isRecord(value.data)) {
+    return false;
+  }
+  return (
+    typeof value.data.newMap === "string" && typeof value.data.prevMap === "string"
+  );
+}
+
+function calculateContainPlacement(
+  args: DrawImageContainArguments,
+): DrawImageContainResult {
+  if (args.imageWidth <= 0 || args.imageHeight <= 0) {
+    return { drawX: 0, drawY: 0, drawWidth: 0, drawHeight: 0 };
+  }
+  if (args.areaWidth <= 0 || args.areaHeight <= 0) {
+    return { drawX: 0, drawY: 0, drawWidth: 0, drawHeight: 0 };
+  }
+  const widthRatio: number = args.areaWidth / args.imageWidth;
+  const heightRatio: number = args.areaHeight / args.imageHeight;
+  const scale: number = Math.min(widthRatio, heightRatio);
+  const drawWidth: number = args.imageWidth * scale;
+  const drawHeight: number = args.imageHeight * scale;
+  const drawX: number = (args.areaWidth - drawWidth) / 2;
+  const drawY: number = (args.areaHeight - drawHeight) / 2;
+  return { drawX, drawY, drawWidth, drawHeight };
+}
+
+function drawMapImageToCanvas(args: {
+  readonly canvas: HTMLCanvasElement;
+  readonly ctx: CanvasRenderingContext2D;
+  readonly image: HTMLImageElement;
+}): void {
+  const devicePixelRatioValue: number = window.devicePixelRatio || 1;
+  const areaWidth: number = args.canvas.clientWidth;
+  const areaHeight: number = args.canvas.clientHeight;
+  const bufferWidth: number = Math.max(
+    1,
+    Math.floor(areaWidth * devicePixelRatioValue),
+  );
+  const bufferHeight: number = Math.max(
+    1,
+    Math.floor(areaHeight * devicePixelRatioValue),
+  );
+  if (args.canvas.width !== bufferWidth || args.canvas.height !== bufferHeight) {
+    args.canvas.width = bufferWidth;
+    args.canvas.height = bufferHeight;
+  }
+  args.ctx.setTransform(devicePixelRatioValue, 0, 0, devicePixelRatioValue, 0, 0);
+  const containPlacement: DrawImageContainResult = calculateContainPlacement({
+    imageWidth: args.image.naturalWidth,
+    imageHeight: args.image.naturalHeight,
+    areaWidth,
+    areaHeight,
+  });
+  args.ctx.clearRect(0, 0, areaWidth, areaHeight);
+  args.ctx.drawImage(
+    args.image,
+    containPlacement.drawX,
+    containPlacement.drawY,
+    containPlacement.drawWidth,
+    containPlacement.drawHeight,
+  );
 }
 
 function isSidebarTokenDragPayload(
@@ -86,7 +262,8 @@ function isOverlayTokenDragPayload(
     payload as Partial<OverlayTokenDragPayload>;
   return (
     payloadCandidate.payloadType === "overlay-token-instance" &&
-    typeof payloadCandidate.tokenId === "string" &&
+    typeof payloadCandidate.tokenId === "number" &&
+    Number.isInteger(payloadCandidate.tokenId) &&
     typeof payloadCandidate.pointerOffsetX === "number" &&
     typeof payloadCandidate.pointerOffsetY === "number"
   );
@@ -231,20 +408,200 @@ export function GameAreaCanvasComponent() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const previousOverlaySizeRef = useRef<OverlaySize | null>(null);
+  const nextTokenIdRef = useRef<number>(1);
   const [tokens, setTokens] = useState<ReadonlyArray<GameTokenInstance>>([]);
-  const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
-  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [draggedTokenId, setDraggedTokenId] = useState<number | null>(null);
+  const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
   const [isTrashHighlighted, setIsTrashHighlighted] = useState<boolean>(false);
   const [canvasZoom, setCanvasZoom] = useState<number>(DEFAULT_CANVAS_ZOOM);
   const [canvasPan, setCanvasPan] = useState<CanvasPanState>({ x: 0, y: 0 });
   const [isPanningCanvas, setIsPanningCanvas] = useState<boolean>(false);
   const panStartRef = useRef<CanvasPanStart | null>(null);
+  const mapImageLoadRequestIdRef = useRef<number>(0);
+
+  function generateTokenId(): number {
+    const tokenId: number = nextTokenIdRef.current;
+    nextTokenIdRef.current += 1;
+    return tokenId;
+  }
+
+  function executeSendTokenAddedMessage(token: GameTokenInstance): void {
+    const message: TokenAddedServerMessage = {
+      command: "token-added",
+      data: {
+        tokenId: String(token.id),
+        token: {
+          type: token.type,
+          label: token.label,
+          width: token.width,
+          height: token.height,
+          color: token.color,
+        },
+        position: {
+          x: token.x,
+          y: token.y,
+        },
+      },
+    };
+    gameAreaWebSocketService.executeSendMessage(message);
+  }
+
+  function executeSendTokenMovedMessage(args: {
+    readonly tokenId: number;
+    readonly prevX: number;
+    readonly prevY: number;
+    readonly nextX: number;
+    readonly nextY: number;
+  }): void {
+    const message: TokenMovedServerMessage = {
+      command: "token-moved",
+      data: {
+        tokenId: String(args.tokenId),
+        prevPos: {
+          x: args.prevX,
+          y: args.prevY,
+        },
+        newPos: {
+          x: args.nextX,
+          y: args.nextY,
+        },
+      },
+    };
+    gameAreaWebSocketService.executeSendMessage(message);
+  }
+
+  function executeDrawMapByUrl(mapUrl: string): void {
+    if (mapUrl.trim().length === 0) {
+      console.warn("[GameAreaCanvas] map-changed ignored because newMap is empty");
+      return;
+    }
+    const canvas: HTMLCanvasElement | null = canvasRef.current;
+    if (canvas === null) {
+      console.warn("[GameAreaCanvas] cannot draw map because canvas is not ready");
+      return;
+    }
+    const ctx: CanvasRenderingContext2D | null = canvas.getContext("2d");
+    if (ctx === null) {
+      console.warn("[GameAreaCanvas] cannot draw map because canvas context is null");
+      return;
+    }
+    const requestId: number = mapImageLoadRequestIdRef.current + 1;
+    mapImageLoadRequestIdRef.current = requestId;
+    const mapImage: HTMLImageElement = new Image();
+    mapImage.onload = (): void => {
+      if (requestId !== mapImageLoadRequestIdRef.current) {
+        return;
+      }
+      drawMapImageToCanvas({ canvas, ctx, image: mapImage });
+    };
+    mapImage.onerror = (): void => {
+      if (requestId !== mapImageLoadRequestIdRef.current) {
+        return;
+      }
+      console.warn(`[GameAreaCanvas] failed to load map image by url=${mapUrl}`);
+    };
+    mapImage.src = mapUrl;
+  }
 
   useEffect(() => {
     if (canvasRef.current === null) {
       return;
     }
     syncCanvasBufferSize(canvasRef.current);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe: () => void = gameAreaWebSocketService.subscribeToMessages(
+      (messageData: unknown): void => {
+        if (isMapChangedServerMessage(messageData)) {
+          executeDrawMapByUrl(messageData.data.newMap);
+          return;
+        }
+        if (isTokenMovedServerMessage(messageData)) {
+          const parsedTokenId: number = Number(messageData.data.tokenId);
+          if (!Number.isInteger(parsedTokenId)) {
+            console.warn(
+              `[GameAreaCanvas] received token-moved with invalid tokenId=${messageData.data.tokenId}`,
+            );
+            return;
+          }
+          setTokens((previousTokens: ReadonlyArray<GameTokenInstance>) => {
+            const hasTokenToMove: boolean = previousTokens.some(
+              (token: GameTokenInstance) => token.id === parsedTokenId,
+            );
+            if (!hasTokenToMove) {
+              console.warn(
+                `[GameAreaCanvas] token not found for token-moved command: tokenId=${messageData.data.tokenId}`,
+              );
+              return previousTokens;
+            }
+            return previousTokens.map((token: GameTokenInstance) =>
+              token.id === parsedTokenId
+                ? {
+                    ...token,
+                    x: messageData.data.newPos.x,
+                    y: messageData.data.newPos.y,
+                  }
+                : token,
+            );
+          });
+          return;
+        }
+        if (!isTokenAddedServerMessage(messageData)) {
+          return;
+        }
+        const parsedTokenId: number = Number(messageData.data.tokenId);
+        if (!Number.isInteger(parsedTokenId)) {
+          console.warn(
+            `[GameAreaCanvas] received token-added with invalid tokenId=${messageData.data.tokenId}`,
+          );
+          return;
+        }
+        const overlayBounds: DOMRect | null = overlayRef.current?.getBoundingClientRect() ?? null;
+        setTokens((previousTokens: ReadonlyArray<GameTokenInstance>) => {
+          const hasTokenWithSameId: boolean = previousTokens.some(
+            (token: GameTokenInstance) => token.id === parsedTokenId,
+          );
+          if (hasTokenWithSameId) {
+            console.warn(
+              `[GameAreaCanvas] token already exists for token-added command: tokenId=${messageData.data.tokenId}`,
+            );
+            return previousTokens;
+          }
+          if (parsedTokenId >= nextTokenIdRef.current) {
+            nextTokenIdRef.current = parsedTokenId + 1;
+          }
+          const boundedPosition: { readonly x: number; readonly y: number } =
+            overlayBounds === null
+              ? {
+                  x: messageData.data.position.x,
+                  y: messageData.data.position.y,
+                }
+              : calculateBoundedPosition({
+                  areaWidth: overlayBounds.width,
+                  areaHeight: overlayBounds.height,
+                  tokenWidth: messageData.data.token.width,
+                  tokenHeight: messageData.data.token.height,
+                  proposedX: messageData.data.position.x,
+                  proposedY: messageData.data.position.y,
+                });
+          const createdToken: GameTokenInstance = {
+            id: parsedTokenId,
+            type: messageData.data.token.type,
+            label: messageData.data.token.label,
+            width: messageData.data.token.width,
+            height: messageData.data.token.height,
+            color: messageData.data.token.color,
+            x: boundedPosition.x,
+            y: boundedPosition.y,
+          };
+          return [...previousTokens, createdToken];
+        });
+      },
+    );
+    return (): void => {
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -376,6 +733,7 @@ export function GameAreaCanvasComponent() {
         ...previousTokens,
         createdToken,
       ]);
+      executeSendTokenAddedMessage(createdToken);
       setSelectedTokenId(createdToken.id);
       return;
     }
@@ -413,6 +771,13 @@ export function GameAreaCanvasComponent() {
           : token,
       ),
     );
+    executeSendTokenMovedMessage({
+      tokenId: movedToken.id,
+      prevX: movedToken.x,
+      prevY: movedToken.y,
+      nextX: boundedCoordinates.x,
+      nextY: boundedCoordinates.y,
+    });
   }
 
   function handleTokenDragStart(
@@ -476,7 +841,7 @@ export function GameAreaCanvasComponent() {
     );
   }
 
-  function handleTokenClick(tokenId: string): void {
+  function handleTokenClick(tokenId: number): void {
     setSelectedTokenId(tokenId);
   }
 

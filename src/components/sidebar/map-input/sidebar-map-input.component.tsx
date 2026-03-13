@@ -1,4 +1,5 @@
 import React from "react";
+import { gameAreaWebSocketService } from "../../../game-area-web-socket.service";
 
 interface DrawImageContainArguments {
   readonly imageWidth: number;
@@ -12,6 +13,14 @@ interface DrawImageContainResult {
   readonly drawY: number;
   readonly drawWidth: number;
   readonly drawHeight: number;
+}
+
+interface MapChangedClientMessage {
+  readonly command: "map-changed";
+  readonly data: {
+    readonly newMap: string;
+    readonly prevMap: string;
+  };
 }
 
 function calculateContainPlacement(
@@ -86,6 +95,14 @@ export function SidebarMapInputComponent({
     }
 
     setCurrentMap(query as string);
+    const mapChangedMessage: MapChangedClientMessage = {
+      command: "map-changed",
+      data: {
+        newMap: query as string,
+        prevMap: currentMap,
+      },
+    };
+    gameAreaWebSocketService.executeSendMessage(mapChangedMessage);
 
     const canvas: HTMLCanvasElement | null = document.getElementById(
       "game-area-canvas",

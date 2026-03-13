@@ -7,7 +7,7 @@ export interface SidebarTokenDragPayload {
 
 export interface OverlayTokenDragPayload {
   readonly payloadType: "overlay-token-instance";
-  readonly tokenId: string;
+  readonly tokenId: number;
   readonly pointerOffsetX: number;
   readonly pointerOffsetY: number;
 }
